@@ -1,0 +1,435 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+using System.IO;
+using System.Text.RegularExpressions;
+
+// This code was borrowed from the BzReader project: http://code.google.com/p/bzreader/
+
+namespace HSpellCoverageTester.CorpusReaders
+{
+    public class WikiDumpReader : ICorpusReader
+    {
+        /// <summary>
+        /// The maximum number of decoded blocks to keep in memory. A single block is roughly 1 M characters = 2 Mb
+        /// </summary>
+        private const int MAX_CACHED_BLOCKS_NO = 30;
+        /// <summary>
+        /// The maximum number of blocks we would be prepared to process in bz2 file.
+        /// 200000 blocks = 160 Gb uncompressed, hope this is enough
+        /// </summary>
+        private const int MAX_BLOCKS_NO = 200000;
+        /// <summary>
+        /// The total number of blocks in the file
+        /// </summary>
+        private long totalBlocks = MAX_BLOCKS_NO;
+        /// <summary>
+        /// UTF8 decoder which would throw on unknown character
+        /// </summary>
+        private Decoder utf8 = new UTF8Encoding(true, false).GetDecoder();
+        /// <summary>
+        /// The path to the dump file
+        /// </summary>
+        private string filePath;
+        /// <summary>
+        /// The buffer for the beginnings of the blocks
+        /// </summary>
+        private long[] beginnings = new long[MAX_BLOCKS_NO];
+        /// <summary>
+        /// The buffer for the ends of the blocks
+        /// </summary>
+        private long[] ends = new long[MAX_BLOCKS_NO];
+        /// <summary>
+        /// The buffer for the current block
+        /// </summary>
+        private byte[] blockBuf;
+        /// <summary>
+        /// The character buffer for the current block
+        /// </summary>
+        private char[] charBuf;
+        /// <summary>
+        /// Percent done for bzip2 block location progress
+        /// </summary>
+        private int bz2_blocks_pct_done;
+        /// <summary>
+        /// Total bz2 file size, for progress calculation
+        /// </summary>
+        private long bz2_filesize;
+        
+        /// <summary>
+        /// Class-level variables to do the allocation just once
+        /// </summary>
+        private byte[] decompressionBuf;
+
+        /// <summary>
+        /// Store the offsets of the previous block in case of the Wiki topic carryover
+        /// </summary>
+        private long previousBlockBeginning = -1;
+        private long previousBlockEnd = -1;
+
+        LinkedList<WikiPage> pages = new LinkedList<WikiPage>();
+
+        public ReportProgressDelegate ProgressFunc { get { return m_progressFunc; } set { m_progressFunc = value; } }
+        private ReportProgressDelegate m_progressFunc = null;
+
+        public WikiDumpReader(string dumpFilePath)
+        {
+            this.filePath = dumpFilePath;
+        }
+
+        /// <summary>
+        /// Locates the bzip2 blocks in the file
+        /// </summary>
+        private void LocateBlocks()
+        {
+            ProgressFunc(0, "Locating bz2 blocks...", true);
+            FileInfo fi = new FileInfo(filePath);
+            bz2_filesize = fi.Length;
+
+            bzip2.StatusCode status = bzip2.BZ2_bzLocateBlocks(filePath, beginnings, ends, ref totalBlocks, ref bz2_blocks_pct_done);
+
+            if (status != bzip2.StatusCode.BZ_OK)
+                throw new Exception(String.Format("Failed locating the blocks in {0}: {1}", filePath, status));
+
+            if (totalBlocks < 1)
+                throw new Exception(String.Format("No bz2 blocks were found in {0}", filePath));
+        }
+
+        /// <summary>
+        /// Loads the bzip2 block from the file
+        /// </summary>
+        /// <param name="beginning">The beginning of the block, in bits.</param>
+        /// <param name="end">The end of the block, in bits.</param>
+        /// <param name="buf">The buffer to load into.</param>
+        /// <returns>The length of the loaded data, in bytes</returns>
+        private long LoadBlock(long beginning, long end, ref byte[] buf)
+        {
+            long bufSize = buf.LongLength;
+
+            bzip2.StatusCode status = bzip2.BZ2_bzLoadBlock(filePath, beginning, end, buf, ref bufSize);
+
+            if (status != bzip2.StatusCode.BZ_OK)
+                throw new Exception(String.Format("Failed loading {0} block starting at {1}: {2}", filePath, beginning, status));
+
+            // Just some initial value, we will reallocate the buffer as needed
+            if (decompressionBuf == null)
+                decompressionBuf = new byte[buf.Length * 4];
+
+            int intBufSize = (int)bufSize;
+            int intDecompSize = decompressionBuf.Length;
+
+            status = bzip2.BZ2_bzDecompress(buf, intBufSize, decompressionBuf, ref intDecompSize);
+
+            // Limit a single uncompressed block size to 32 Mb
+            while (status == bzip2.StatusCode.BZ_OUTBUFF_FULL &&
+                decompressionBuf.Length < 32000000)
+            {
+                decompressionBuf = new byte[decompressionBuf.Length * 2];
+
+                intDecompSize = decompressionBuf.Length;
+
+                status = bzip2.BZ2_bzDecompress(buf, intBufSize, decompressionBuf, ref intDecompSize);
+            }
+
+            if (decompressionBuf.Length > 32000000)
+                throw new Exception(String.Format("Failed uncompressing block starting at {0}: too much memory required", beginning));
+
+            if (status != bzip2.StatusCode.BZ_OK)
+                throw new Exception(String.Format("Failed uncompressing block starting at {0}: {1}", beginning, status));
+
+            // Exchange the raw buffer and the uncompressed one
+
+            byte[] exch = buf;
+
+            buf = decompressionBuf;
+
+            decompressionBuf = exch;
+
+            return intDecompSize;
+        }
+
+        public void Read()
+        {
+            // Locate the bzip2 blocks in the file
+            LocateBlocks();
+
+            // Two times more than the first block but not less than 100 bytes
+            long bufSize = ((ends[0] - beginnings[0]) / 8) * 2 + 100;
+
+            // Buffers for the current and next block
+            blockBuf = new byte[bufSize];
+            charBuf = new char[bufSize];
+
+            // Whether there was a Wiki topic carryover from current block to the next one
+            char[] charCarryOver = new char[0];
+
+            // The length of the currently loaded data
+            long loadedLength = 0;
+
+            ProgressFunc(0, "Reading Wiki pages...", true);
+            StringBuilder sb = new StringBuilder();
+
+            for (long currentBlock = 0; currentBlock < totalBlocks && !AbortReading; currentBlock++)
+            {
+                ProgressFunc((byte)((double)(currentBlock * 100) / (double)totalBlocks), null, true);
+
+                loadedLength = LoadBlock(beginnings[currentBlock], ends[currentBlock], ref blockBuf);
+
+                if (charBuf.Length < blockBuf.Length)
+                {
+                    charBuf = new char[blockBuf.Length];
+                }
+
+                int bytesUsed = 0;
+                int charsUsed = 0;
+                bool completed = false;
+
+                // Convert the text to UTF8
+                utf8.Convert(blockBuf, 0, (int)loadedLength, charBuf, 0, charBuf.Length, currentBlock == totalBlocks - 1, out bytesUsed, out charsUsed, out completed);
+
+                if (!completed)
+                    throw new Exception("UTF8 decoder could not complete the conversion");
+
+                // Construct a current string
+                sb.Length = 0;
+
+                if (charCarryOver.Length > 0)
+                {
+                    sb.Append(charCarryOver);
+                }
+
+                sb.Append(charBuf, 0, charsUsed);
+
+                int carryOverLength = charCarryOver.Length;
+
+                int charsMatched = ProcessBlock(sb.ToString(), beginnings[currentBlock], ends[currentBlock],
+                     carryOverLength, currentBlock == totalBlocks - 1);
+
+                // There's a Wiki topic carryover, let's store the characters which need to be carried over 
+                if (charsMatched > 0)
+                {
+                    charCarryOver = new char[charsMatched];
+
+                    sb.CopyTo(charsUsed + carryOverLength - charsMatched, charCarryOver, 0, charsMatched);
+                }
+                else
+                {
+                    charCarryOver = new char[0];
+                }
+            }
+        }
+
+        /// <summary>
+        /// Indexes the provided string
+        /// </summary>
+        /// <param name="currentText">The string to index</param>
+        /// <param name="beginning">The beginning offset of the block</param>
+        /// <param name="end">The end offset of the block</param>
+        /// <param name="charCarryOver">Whether there was a Wiki topic carryover from previous block</param>
+        /// <param name="lastBlock">True if this is the last block</param>
+        /// <returns>The number of characters in the end of the string that match the header entry</returns>
+        private int ProcessBlock(string currentText, long beginning, long end, int charCarryOver, bool lastBlock)
+        {
+            bool firstRun = true;
+
+            int topicStart = currentText.IndexOf("<title>", StringComparison.InvariantCultureIgnoreCase);
+
+            int titleEnd, idStart, idEnd, topicEnd = -1;
+
+            string title = String.Empty;
+            long id = -1;
+
+            while (topicStart >= 0 && !AbortReading)
+            {
+                titleEnd = -1;
+                idStart = -1;
+                idEnd = -1;
+                topicEnd = -1;
+
+                titleEnd = currentText.IndexOf("</title>", topicStart, StringComparison.InvariantCultureIgnoreCase);
+
+                if (titleEnd < 0)
+                    break;
+
+                title = currentText.Substring(topicStart + "<title>".Length, titleEnd - topicStart - "<title>".Length);
+
+                idStart = currentText.IndexOf("<id>", titleEnd, StringComparison.InvariantCultureIgnoreCase);
+                if (idStart < 0)
+                    break;
+
+                idEnd = currentText.IndexOf("</id>", idStart, StringComparison.InvariantCultureIgnoreCase);
+                if (idEnd < 0)
+                    break;
+
+                id = Convert.ToInt64(currentText.Substring(idStart + "<id>".Length, idEnd - idStart - "<id>".Length));
+                
+                topicEnd = currentText.IndexOf("</text>", idEnd, StringComparison.InvariantCultureIgnoreCase);
+                if (topicEnd < 0)
+                    break;
+
+                // Start creating the object for the tokenizing ThreadPool thread
+                long[] begins = new long[1];
+                long[] ends = new long[1];
+
+                // Was there a carryover?
+                if (firstRun)
+                {
+                    // Did the <title> happen in the carryover area?
+                    if (charCarryOver > 0 &&
+                        topicStart < charCarryOver)
+                    {
+                        if (previousBlockBeginning > -1 &&
+                            previousBlockEnd > -1)
+                        {
+                            begins = new long[2];
+                            ends = new long[2];
+
+                            begins[1] = previousBlockBeginning;
+                            ends[1] = previousBlockEnd;
+                        }
+                        else
+                        {
+                            throw new Exception("A Wiki topic title carryover occurred, but no previous block has been stored");
+                        }
+                    }
+                }
+
+                begins[0] = beginning;
+                ends[0] = end;
+
+                //WikiPage p = new WikiPage(id, title, begins, ends);
+
+                string contents = currentText.Substring(topicStart, topicEnd - topicStart + 7/* "</text>".Length */);
+                contents = WikiPage.GetContentSection(contents, id, title);
+
+                // Strip all HTML tags
+                string strippedContent = Regex.Replace(contents
+                    , @"</?[A-Z][A-Z0-9]*\b[^>]*>", " ", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+
+                // Remove language referral tags
+                strippedContent = Regex.Replace(strippedContent, @"\[\[([A-Z-]+?):(.+?):(.+?)\]\]", " ", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+                
+                // For some weird reason, the Niqqud character Dagesh is not being used directly in he-wiki but
+                // through the use of special markup
+                strippedContent = strippedContent.Replace("{{דגש}}", "\u05BC");
+
+                // Process document
+                HitDocumentFunc(string.Format("{0} {1}", title, strippedContent), id);
+
+                // Store the last successful title start position
+                int nextTopicStart = currentText.IndexOf("<title>", topicStart + 1, StringComparison.InvariantCultureIgnoreCase);
+
+                if (nextTopicStart >= 0)
+                {
+                    topicStart = nextTopicStart;
+                }
+                else
+                {
+                    break;
+                }
+
+                firstRun = false;
+            }
+
+            // Now calculate how many characters we need to save for next block
+            int charsToSave = 0;
+
+            if (topicStart == -1)
+            {
+                if (!lastBlock)
+                {
+                    throw new Exception("No topics were found in the block");
+                }
+            }
+            else
+            {
+                if (!lastBlock)
+                {
+                    if (topicEnd == -1)
+                    {
+                        charsToSave = currentText.Length - topicStart;
+                    }
+                    else
+                    {
+                        if (topicStart < topicEnd)
+                        {
+                            charsToSave = currentText.Length - topicEnd - "</text>".Length;
+                        }
+                        else
+                        {
+                            charsToSave = currentText.Length - topicStart;
+                        }
+                    }
+                }
+            }
+
+            previousBlockBeginning = beginning;
+            previousBlockEnd = end;
+
+            return charsToSave;
+        }
+
+        /// <summary>
+        /// Loads a block from the file, decompresses it and decodes to string
+        /// </summary>
+        /// <param name="begin">The list of block beginnings</param>
+        /// <param name="end">The list of block ends</param>
+        /// <returns>The decoded string</returns>
+        public string LoadAndDecodeBlock(long[] begin, long[] end)
+        {
+            byte[] currentBuf = null;
+
+            utf8.Reset();
+            StringBuilder sb = new StringBuilder();
+
+            for (int i = 0; i < begin.Length; i++)
+            {
+                if (blockBuf == null)
+                {
+                    blockBuf = new byte[((end[i] - begin[i]) / 8) * 2 + 100];
+                }
+
+                long loadedLen = LoadBlock(begin[i], end[i], ref blockBuf);
+
+                currentBuf = new byte[loadedLen];
+
+                Array.Copy(blockBuf, 0, currentBuf, 0, (int)loadedLen);
+
+                if (charBuf == null ||
+                    charBuf.Length < currentBuf.Length)
+                {
+                    charBuf = new char[currentBuf.Length];
+                }
+
+                int bytesUsed = 0;
+                int charsUsed = 0;
+                bool completed = false;
+
+                utf8.Convert(currentBuf, 0, currentBuf.Length, charBuf, 0, charBuf.Length, i == begin.Length,
+                    out bytesUsed, out charsUsed, out completed);
+
+                sb.Append(charBuf, 0, charsUsed);
+            }
+
+            return sb.ToString();
+        }
+
+        #region ICorpusReader Members
+
+        public HitDocumentDelegate HitDocumentFunc
+        {
+            get { return m_hitDocumentFunc; }
+            set { m_hitDocumentFunc = value; }
+        }
+        private HitDocumentDelegate m_hitDocumentFunc = null;
+
+        public bool AbortReading
+        {
+            get { return m_AbortReading; }
+            set { m_AbortReading = value; }
+        }
+        private bool m_AbortReading = false;
+
+        #endregion
+    }
+}

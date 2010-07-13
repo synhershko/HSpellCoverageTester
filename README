@@ -1,0 +1,37 @@
+A utility application to test the language coverage of the hspell dictionary
+(http://hspell.ivrix.org.il/, Copyright (C) 2000-2010, Nadav Har'El and Dan Kenigsberg)
+
+See: http://www.code972.com/blog/2010/07/testing-hspell-language-coverage-using-wikipedia
+
+Copyright (C) 2010, Itamar Syn-Hershko
+
+It is released to the public licensed under the GNU General Public License
+(GPL). See the COPYING file included in this distribution for the whole text
+of the GNU General Public License version 2. Note that not only the programs in
+the distribution, but also the dictionary files and the generated word lists, are
+licensed under the GPL.
+There is no warranty of any kind for the contents of this distribution.
+
+Some code was borrowed from the BzReader project: http://code.google.com/p/bzreader/,
+also released under the GNU GPL.
+
+Usage:
+	1. Get the sources to a local folder (download tree / git clone)
+	
+	2. Refresh the HebMorph dependency (HebMorph.csproj) to point to a local copy
+	of http://github.com/synhershko/HebMorph
+	
+	3. Download a he-wiki dump (pages-articles.xml.bz2) from http://dumps.wikimedia.org/hewiki/
+	
+	4. Compile and run the application.
+	
+	5. Point at the hspell-data-files folder and at the he-wiki bz2 file you downloaded.
+	Pick a destimation for the report XML.
+	
+	6. Check / uncheck the Compute Coverage checkbox (may take much longer if checked). It
+	tells the application whether or not to count all the unique words in the corpus.
+	
+	7. Click Execute, and wait.
+	
+	8. Saving the report currently is a lengthy process, which isn't reflecting through
+	the progress bar. Be patient...
