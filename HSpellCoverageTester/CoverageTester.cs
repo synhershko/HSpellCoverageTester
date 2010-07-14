@@ -22,6 +22,16 @@ namespace HSpellCoverageTester
         private HebMorph.StreamLemmatizer lemmatizer;
         private HebMorph.DataStructures.DictRadix<object> radix;
 
+        enum FoundInCorpusType { foundInCorpusType };
+        private static readonly FoundInCorpusType fict = FoundInCorpusType.foundInCorpusType;
+
+        public bool WasAbortSet
+        {
+            get { return m_bAbort; }
+            set { m_bAbort = value; }
+        }
+        private bool m_bAbort = false;
+
         public CoverageTester(ICorpusReader cr, string _hspellPath)
         {
             this.corpusReader = cr;
@@ -46,9 +56,8 @@ namespace HSpellCoverageTester
             corpusReader.AbortReading = false;
             corpusReader.Read();
 
-            if (!corpusReader.AbortReading && !string.IsNullOrEmpty(reportPath))
+            if (!WasAbortSet && !string.IsNullOrEmpty(reportPath))
             {
-                ReportProgress(99, "Saving report...", true);
                 SaveReport(reportPath);
             }
 
@@ -100,40 +109,32 @@ namespace HSpellCoverageTester
                 // Otherwise, the token is either in the dictionary already, or is not a Hebrew word. If we
                 // are performing complete coverage computation, add it to the radix as well
                 
-                // A non-Hebrew word, or we are not performing a coverage calculation
-                if (!ComputeCoverage || (tokens.Count == 1 && !(tokens[0] is HebMorph.HebrewToken)))
-                    continue;
+                // If we are performing a coverage calculation
+                if (ComputeCoverage)
+                {
+                    // A non-Hebrew word
+                    if (tokens.Count == 1 && !(tokens[0] is HebMorph.HebrewToken))
+                        continue;
 
-                // Hebrew words with one lemma or more - store the word in the radix with a flag
-                // signaling it was indeed found
-                radix.AddNode(word, (sbyte)-1);
+                    // Hebrew words with one lemma or more - store the word in the radix with a flag
+                    // signaling it was indeed found
+                    radix.AddNode(word, fict);
+                }
             }
         }
 
         public void Abort()
         {
+            this.WasAbortSet = true;
             corpusReader.AbortReading = true;
         }
 
         public void SaveReport(string reportPath)
         {
+            ReportProgress(99, "Saving report...", true);
+
             int unrecWordsCount = 0, totalWordsCount = 0, likelyErrors = 0;
             Encoder utf8 = new UTF8Encoding(true, false).GetEncoder();
-
-            // Get and sort all the unknown words
-            RealSortedList<string> unrecognizedWords = new RealSortedList<string>(SortOrder.Asc);
-            DictRadix<object>.RadixEnumerator en = radix.GetEnumerator() as DictRadix<object>.RadixEnumerator;
-            while (en.MoveNext())
-            {
-                totalWordsCount++;
-
-                // A known word
-                if (ComputeCoverage && en.Current is sbyte && ((sbyte)en.Current) == -1)
-                    continue;
-
-                unrecognizedWords.AddUnique(en.CurrentKey);
-                unrecWordsCount++;
-            }
 
             // Naive serialization, to support planned extensions more easily
             using (System.IO.FileStream fs = new System.IO.FileStream(reportPath, System.IO.FileMode.Create))
@@ -145,11 +146,24 @@ namespace HSpellCoverageTester
                 fs.Write(buf, 0, buf.Length);
 
                 bool bLikelyError;
-                foreach (string w in unrecognizedWords)
+                int wordsCount = radix.Count;
+
+                // Get and sort all the unknown words
+                DictRadix<object>.RadixEnumerator en = radix.GetEnumerator() as DictRadix<object>.RadixEnumerator;
+                while (en.MoveNext() && !WasAbortSet)
                 {
+                    totalWordsCount++;
+
+                    // A known word - only relevant if ComputeCoverage == true
+                    if (en.Current is FoundInCorpusType)
+                        continue;
+
+                    string w = en.CurrentKey;
+                    unrecWordsCount++;
+
                     bLikelyError = false;
 
-                    if (Regex.IsMatch(w, @"[\W]*?[ףץןם]+?[\W]+") // final letters should be used only at the end of word
+                    if (!Regex.IsMatch(w, @"^[אבגדהוזחטיכלמנסעפצקרשת'""]+?[ףץךןם]??[']??$") // final letters should be used only at the end of word
                         || w.Length > 15 // too long a word
                         )
                     {
@@ -157,22 +171,29 @@ namespace HSpellCoverageTester
                         bLikelyError = true;
                     }
 
-                    object oData = radix.Lookup(w);
                     buf = StringToByteArray(string.Format(@"<word text=""{0}"" location=""{1}"" {2}/>{3}",
-                        w, oData, bLikelyError ? @"likelyerror=""true"" " : string.Empty, Environment.NewLine)
+                        w, en.Current, bLikelyError ? @"likelyerror=""true"" " : string.Empty, Environment.NewLine)
                         , utf8);
                     fs.Write(buf, 0, buf.Length);
+
+                    ReportProgress(99, string.Format("Saving report... ({0} / {1})", totalWordsCount, wordsCount), true);
                 }
 
-                buf = StringToByteArray(@"</unrecognized>" + Environment.NewLine, utf8);
-                fs.Write(buf, 0, buf.Length);
+                if (!WasAbortSet)
+                {
+                    buf = StringToByteArray(@"</unrecognized>" + Environment.NewLine, utf8);
+                    fs.Write(buf, 0, buf.Length);
 
-                string stats = string.Format(@"<stats unknownWords=""{0}"" likelyErrors=""{1}"" ", unrecWordsCount, likelyErrors);
-                if (ComputeCoverage)
-                    stats += string.Format(@"totalWords=""{0}"" coverageRate=""{1}%"" ", totalWordsCount,
-                       (byte)(100 - (byte)(((unrecWordsCount - likelyErrors) / totalWordsCount) * 100)));
-                buf = StringToByteArray(stats + " />" + Environment.NewLine, utf8);
-                fs.Write(buf, 0, buf.Length);
+                    string stats = string.Format(@"<stats unknownWords=""{0}"" likelyErrors=""{1}"" ", unrecWordsCount, likelyErrors);
+                    if (ComputeCoverage)
+                    {
+                        unrecWordsCount -= likelyErrors;
+                        stats += string.Format(@"totalWords=""{0}"" coverageRate=""{1}%"" ", totalWordsCount,
+                           100 - (unrecWordsCount / totalWordsCount) * 100);
+                    }
+                    buf = StringToByteArray(stats + " />" + Environment.NewLine, utf8);
+                    fs.Write(buf, 0, buf.Length);
+                }
 
                 fs.Close();
             }

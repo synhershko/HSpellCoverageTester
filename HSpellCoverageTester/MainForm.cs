@@ -140,9 +140,13 @@ namespace HSpellCoverageTester
 
         protected override void OnClosing(CancelEventArgs e)
         {
-            coverageTester.Abort();
-            workerThread.Abort();
-            workerThread = null;
+            if (coverageTester!=null)
+                coverageTester.Abort();
+            if (workerThread != null)
+            {
+                workerThread.Abort();
+                workerThread = null;
+            }
             coverageTester = null;
 
             base.OnClosing(e);

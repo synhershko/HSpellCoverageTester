@@ -237,7 +237,7 @@ namespace HSpellCoverageTester.CorpusReaders
             int titleEnd, idStart, idEnd, topicEnd = -1;
 
             string title = String.Empty;
-            long id = -1;
+            long id;
 
             while (topicStart >= 0 && !AbortReading)
             {
