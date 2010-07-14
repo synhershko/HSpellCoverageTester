@@ -20,10 +20,14 @@ namespace HSpellCoverageTester
         private ICorpusReader corpusReader;
         private string HSpellPath = string.Empty;
         private HebMorph.StreamLemmatizer lemmatizer;
-        private HebMorph.DataStructures.DictRadix<object> radix;
+        private HebMorph.DataStructures.DictRadix<CoverageData> radix;
 
-        enum FoundInCorpusType { foundInCorpusType };
-        private static readonly FoundInCorpusType fict = FoundInCorpusType.foundInCorpusType;
+        protected class CoverageData
+        {
+            public bool KnownToHSpell;
+            public int Count;
+            public object FirstKnownLocation;
+        }
 
         public bool WasAbortSet
         {
@@ -45,7 +49,7 @@ namespace HSpellCoverageTester
         public void Run(string reportPath)
         {
             radix = null;
-            radix = new HebMorph.DataStructures.DictRadix<object>();
+            radix = new HebMorph.DataStructures.DictRadix<CoverageData>();
 
             ReportProgress(0, "Initializing hspell...", true);
             lemmatizer = new HebMorph.StreamLemmatizer(HSpellPath, true, false);
@@ -102,7 +106,19 @@ namespace HSpellCoverageTester
                 // Unrecognized Hebrew word
                 if (tokens.Count == 0)
                 {
-                    radix.AddNode(word, docID);
+                    CoverageData o = radix.Lookup(word);
+                    if (o != null)
+                    {
+                        o.Count++;
+                    }
+                    else
+                    {
+                        o = new CoverageData();
+                        o.Count = 1;
+                        o.FirstKnownLocation = docID;
+                        o.KnownToHSpell = false;
+                        radix.AddNode(word, o);
+                    }
                     continue;
                 }
 
@@ -118,7 +134,19 @@ namespace HSpellCoverageTester
 
                     // Hebrew words with one lemma or more - store the word in the radix with a flag
                     // signaling it was indeed found
-                    radix.AddNode(word, fict);
+                    CoverageData o = radix.Lookup(word);
+                    if (o != null)
+                    {
+                        o.Count++;
+                    }
+                    else
+                    {
+                        o = new CoverageData();
+                        o.Count = 1;
+                        o.FirstKnownLocation = docID;
+                        o.KnownToHSpell = true;
+                        radix.AddNode(word, o);
+                    }
                 }
             }
         }
@@ -149,13 +177,15 @@ namespace HSpellCoverageTester
                 int wordsCount = radix.Count;
 
                 // Get and sort all the unknown words
-                DictRadix<object>.RadixEnumerator en = radix.GetEnumerator() as DictRadix<object>.RadixEnumerator;
+                CoverageData cd = null;
+                DictRadix<CoverageData>.RadixEnumerator en = radix.GetEnumerator() as DictRadix<CoverageData>.RadixEnumerator;
                 while (en.MoveNext() && !WasAbortSet)
                 {
                     totalWordsCount++;
 
                     // A known word - only relevant if ComputeCoverage == true
-                    if (en.Current is FoundInCorpusType)
+                    cd = en.Current as CoverageData;
+                    if (cd == null || cd.KnownToHSpell)
                         continue;
 
                     string w = en.CurrentKey;
@@ -171,8 +201,9 @@ namespace HSpellCoverageTester
                         bLikelyError = true;
                     }
 
-                    buf = StringToByteArray(string.Format(@"<word text=""{0}"" location=""{1}"" {2}/>{3}",
-                        w, en.Current, bLikelyError ? @"likelyerror=""true"" " : string.Empty, Environment.NewLine)
+                    buf = StringToByteArray(string.Format(@"<word text=""{0}"" location=""{1}"" occurs=""{2}"" {3}/>{4}"
+                        , w, cd.FirstKnownLocation, cd.Count
+                        , bLikelyError ? @"likelyerror=""true"" " : string.Empty, Environment.NewLine)
                         , utf8);
                     fs.Write(buf, 0, buf.Length);
 
@@ -189,7 +220,7 @@ namespace HSpellCoverageTester
                     {
                         unrecWordsCount -= likelyErrors;
                         stats += string.Format(@"totalWords=""{0}"" coverageRate=""{1}%"" ", totalWordsCount,
-                           100 - (unrecWordsCount / totalWordsCount) * 100);
+                           (100 - (unrecWordsCount * 100 / totalWordsCount)));
                     }
                     buf = StringToByteArray(stats + " />" + Environment.NewLine, utf8);
                     fs.Write(buf, 0, buf.Length);
