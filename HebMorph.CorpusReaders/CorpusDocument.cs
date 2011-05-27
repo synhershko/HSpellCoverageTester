@@ -1,4 +1,4 @@
-﻿namespace HSpellCoverageTester.Common
+﻿namespace HebMorph.CorpusReaders
 {
 	/// <summary>
 	/// Represents a document in a corpus

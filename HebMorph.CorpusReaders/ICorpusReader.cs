@@ -1,6 +1,4 @@
-﻿using HSpellCoverageTester.Common;
-
-namespace HSpellCoverageTester.CorpusReaders
+﻿namespace HebMorph.CorpusReaders
 {
 	public delegate void ReportProgressDelegate(int progressPercentage, string status, bool isRunning);
     public delegate void HitDocumentDelegate(CorpusDocument doc);

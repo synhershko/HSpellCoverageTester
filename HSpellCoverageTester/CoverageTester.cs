@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Text;
 using System.Text.RegularExpressions;
-
-using HSpellCoverageTester.CorpusReaders;
-using HSpellCoverageTester.Common;
+using HebMorph.CorpusReaders;
+using HebMorph.CorpusReaders.Common;
 using HebMorph.DataStructures;
 
 namespace HSpellCoverageTester

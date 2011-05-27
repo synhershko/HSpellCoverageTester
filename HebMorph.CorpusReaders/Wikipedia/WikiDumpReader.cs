@@ -1,14 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text;
 using System.IO;
-using System.Text.RegularExpressions;
 using System.Web;
-using HSpellCoverageTester.Common;
+using HebMorph.CorpusReaders.Common;
 
 // This code was borrowed from the BzReader project: http://code.google.com/p/bzreader/
 
-namespace HSpellCoverageTester.CorpusReaders
+namespace HebMorph.CorpusReaders.Wikipedia
 {
     public class WikiDumpReader : ICorpusReader
     {

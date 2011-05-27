@@ -1,15 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Text;
 using System.Windows.Forms;
 using System.IO;
 using System.Threading;
-
-using HSpellCoverageTester.CorpusReaders;
-using HSpellCoverageTester.Common;
+using HebMorph.CorpusReaders;
+using HebMorph.CorpusReaders.Common;
+using HebMorph.CorpusReaders.Wikipedia;
 
 namespace HSpellCoverageTester
 {
@@ -30,9 +26,9 @@ namespace HSpellCoverageTester
             InitializeComponent();
         }
 
-        private string SelectHSpellFolderPath()
+        private static string SelectHSpellFolderPath()
         {
-            FolderBrowserDialog fbd = new FolderBrowserDialog();
+            var fbd = new FolderBrowserDialog();
 
             // Help locating the hspell-data-files folder
             string exeFile = (new System.Uri(System.Reflection.Assembly.GetEntryAssembly().CodeBase)).AbsolutePath;
@@ -54,7 +50,7 @@ namespace HSpellCoverageTester
 
         private void btnSelectCorpusWikiDump_Click(object sender, EventArgs e)
         {
-            OpenFileDialog ofd = new OpenFileDialog();
+            var ofd = new OpenFileDialog();
             
             DialogResult dr = ofd.ShowDialog();
             if (dr == DialogResult.OK && !string.IsNullOrEmpty(ofd.FileName))
@@ -65,8 +61,8 @@ namespace HSpellCoverageTester
 
         private void btnSelectReportPath_Click(object sender, EventArgs e)
         {
-            SaveFileDialog sfd = new SaveFileDialog();
-            DialogResult dr = sfd.ShowDialog();
+            var sfd = new SaveFileDialog();
+            var dr = sfd.ShowDialog();
             if (dr == DialogResult.OK && !string.IsNullOrEmpty(sfd.FileName))
             {
                 txbReportPath.Text = sfd.FileName;
@@ -103,7 +99,7 @@ namespace HSpellCoverageTester
                     ICorpusReader cr = new WikiDumpReader(txbCorpusPath.Text);
                     coverageTester = new CoverageTester(cr, txbHSpellPath.Text);
                     coverageTester.ComputeCoverage = chbComputeCoverage.Checked;
-                    coverageTester.ProgressChanged += new ProgressChangedEventHandler(OnProgressChanged);
+                    coverageTester.ProgressChanged += OnProgressChanged;
                     coverageTester.Run(txbReportPath.Text);
                 });
                 workerThread.Start();
@@ -117,7 +113,7 @@ namespace HSpellCoverageTester
 
         private void UpdateProgress(object sender, ProgressChangedEventArgs e)
         {
-            ProgressInfo pi = (ProgressInfo)e.UserState;
+            var pi = (ProgressInfo)e.UserState;
             if (!pi.IsStillRunning)
             {
                 workerThread.Abort();

@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>HSpellCoverageTester</RootNamespace>
     <AssemblyName>HSpellCoverageTester</AssemblyName>
-    <TargetFrameworkVersion>v2.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
     <OldToolsVersion>2.0</OldToolsVersion>
@@ -30,6 +30,7 @@
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -60,10 +61,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Common\bzip2.cs" />
-    <Compile Include="Common\CorpusDocument.cs" />
-    <Compile Include="Common\ProgressInfo.cs" />
-    <Compile Include="CorpusReaders\ICorpusReader.cs" />
     <Compile Include="CoverageTester.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
@@ -87,6 +84,7 @@
       <DependentUpon>Resources.resx</DependentUpon>
       <DesignTime>True</DesignTime>
     </Compile>
+    <None Include="app.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -96,12 +94,15 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
-    <Compile Include="CorpusReaders\WikiDumpReader.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\HebMorph\dotNet\HebMorph\HebMorph.csproj">
       <Project>{EF21A9E0-8FEE-43CD-8D60-B3696E033FED}</Project>
       <Name>HebMorph</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\HebMorph.CorpusReaders\HebMorph.CorpusReaders.csproj">
+      <Project>{EE237190-F52A-47FC-8BAA-D03445A11172}</Project>
+      <Name>HebMorph.CorpusReaders</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
@@ -130,7 +131,11 @@
   </Target>
   -->
   <PropertyGroup>
-    <PreBuildEvent>copy /Y "$(SolutionDir)\bzip2\bin\$(ConfigurationName)\bzip2.dll" "$(TargetDir)"
-copy /Y "$(SolutionDir)\bzip2\bin\$(ConfigurationName)\bzip2.pdb" "$(TargetDir)"</PreBuildEvent>
+    <PreBuildEvent>
+    </PreBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PostBuildEvent>copy /Y "$(SolutionDir)\bzip2\bin\$(ConfigurationName)\bzip2.dll" "$(TargetDir)"
+copy /Y "$(SolutionDir)\bzip2\bin\$(ConfigurationName)\bzip2.pdb" "$(TargetDir)"</PostBuildEvent>
   </PropertyGroup>
 </Project>
