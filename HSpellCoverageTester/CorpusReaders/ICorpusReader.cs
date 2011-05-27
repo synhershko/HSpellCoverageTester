@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace HSpellCoverageTester.CorpusReaders
+﻿namespace HSpellCoverageTester.CorpusReaders
 {
     public delegate void HitDocumentDelegate(object documentContent, object documentLocation);
 

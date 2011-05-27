@@ -10,17 +10,17 @@ using HebMorph.DataStructures;
 
 namespace HSpellCoverageTester
 {
-    public delegate void ReportProgressDelegate(int progressPercentage, string Status, bool isRunning);
+    public delegate void ReportProgressDelegate(int progressPercentage, string status, bool isRunning);
 
     public class CoverageTester
     {
         public event ProgressChangedEventHandler ProgressChanged;
         public bool ComputeCoverage = true;
 
-        private ICorpusReader corpusReader;
-        private string HSpellPath = string.Empty;
+        private readonly ICorpusReader corpusReader;
+        private readonly string HSpellPath = string.Empty;
         private HebMorph.StreamLemmatizer lemmatizer;
-        private HebMorph.DataStructures.DictRadix<CoverageData> radix;
+        private DictRadix<CoverageData> radix;
 
         protected class CoverageData
         {
@@ -29,17 +29,13 @@ namespace HSpellCoverageTester
             public object FirstKnownLocation;
         }
 
-        public bool WasAbortSet
-        {
-            get { return m_bAbort; }
-            set { m_bAbort = value; }
-        }
-        private bool m_bAbort = false;
+    	public bool WasAbortSet { get; set; }
 
-        public CoverageTester(ICorpusReader cr, string _hspellPath)
+    	public CoverageTester(ICorpusReader cr, string hspellPath)
         {
-            this.corpusReader = cr;
-            this.HSpellPath = _hspellPath;
+        	WasAbortSet = false;
+        	corpusReader = cr;
+            HSpellPath = hspellPath;
         }
 
         public void Run()
@@ -49,13 +45,12 @@ namespace HSpellCoverageTester
         public void Run(string reportPath)
         {
             radix = null;
-            radix = new HebMorph.DataStructures.DictRadix<CoverageData>();
+            radix = new DictRadix<CoverageData>();
 
             ReportProgress(0, "Initializing hspell...", true);
-            lemmatizer = new HebMorph.StreamLemmatizer(HSpellPath, true, false);
-            lemmatizer.TolerateWhenLemmatizingStream = false;
+            lemmatizer = new HebMorph.StreamLemmatizer(HSpellPath, true, false) {TolerateWhenLemmatizingStream = false};
 
-            corpusReader.HitDocumentFunc = GotDocument;
+        	corpusReader.HitDocumentFunc = GotDocument;
             corpusReader.ProgressFunc = ReportProgress;
             corpusReader.AbortReading = false;
             corpusReader.Read();
@@ -68,12 +63,10 @@ namespace HSpellCoverageTester
             ReportProgress(100, "Finalizing...", false);
         }
 
-        protected void ReportProgress(int progressPercentage, string Status, bool isRunning)
+        protected void ReportProgress(int progressPercentage, string status, bool isRunning)
         {
-            ProgressInfo pi = new ProgressInfo();
-            pi.Status = Status;
-            pi.IsStillRunning = isRunning;
-            ReportProgress(progressPercentage, pi);
+            var pi = new ProgressInfo {Status = status, IsStillRunning = isRunning};
+        	ReportProgress(progressPercentage, pi);
         }
 
         protected void ReportProgress(int progressPercentage, ProgressInfo pi)
@@ -84,14 +77,14 @@ namespace HSpellCoverageTester
             }
         }
 
-        private void GotDocument(object doc, object docID)
+        private void GotDocument(object doc, object docId)
         {
             if (doc == null)
                 return;
 
-            string docContents = doc.ToString();
-            string word = string.Empty;
-            List<HebMorph.Token> tokens = new List<HebMorph.Token>();
+            var docContents = doc.ToString();
+            var word = string.Empty;
+            var tokens = new List<HebMorph.Token>();
 
             lemmatizer.SetStream(new System.IO.StringReader(docContents));
             
@@ -106,18 +99,15 @@ namespace HSpellCoverageTester
                 // Unrecognized Hebrew word
                 if (tokens.Count == 0)
                 {
-                    CoverageData o = radix.Lookup(word);
+                    var o = radix.Lookup(word);
                     if (o != null)
                     {
                         o.Count++;
                     }
                     else
                     {
-                        o = new CoverageData();
-                        o.Count = 1;
-                        o.FirstKnownLocation = docID;
-                        o.KnownToHSpell = false;
-                        radix.AddNode(word, o);
+                        o = new CoverageData {Count = 1, FirstKnownLocation = docId, KnownToHSpell = false};
+                    	radix.AddNode(word, o);
                     }
                     continue;
                 }
@@ -134,18 +124,15 @@ namespace HSpellCoverageTester
 
                     // Hebrew words with one lemma or more - store the word in the radix with a flag
                     // signaling it was indeed found
-                    CoverageData o = radix.Lookup(word);
+                    var o = radix.Lookup(word);
                     if (o != null)
                     {
                         o.Count++;
                     }
                     else
                     {
-                        o = new CoverageData();
-                        o.Count = 1;
-                        o.FirstKnownLocation = docID;
-                        o.KnownToHSpell = true;
-                        radix.AddNode(word, o);
+                        o = new CoverageData {Count = 1, FirstKnownLocation = docId, KnownToHSpell = true};
+                    	radix.AddNode(word, o);
                     }
                 }
             }
@@ -153,7 +140,7 @@ namespace HSpellCoverageTester
 
         public void Abort()
         {
-            this.WasAbortSet = true;
+            WasAbortSet = true;
             corpusReader.AbortReading = true;
         }
 
@@ -162,36 +149,38 @@ namespace HSpellCoverageTester
             ReportProgress(99, "Saving report...", true);
 
             int unrecWordsCount = 0, totalWordsCount = 0, likelyErrors = 0;
-            Encoder utf8 = new UTF8Encoding(true, false).GetEncoder();
+            var utf8 = new UTF8Encoding(true, false).GetEncoder();
 
             // Naive serialization, to support planned extensions more easily
-            using (System.IO.FileStream fs = new System.IO.FileStream(reportPath, System.IO.FileMode.Create))
+            using (var fs = new System.IO.FileStream(reportPath, System.IO.FileMode.Create))
             {
-                byte[] BOM = Encoding.UTF8.GetPreamble();
+                var BOM = Encoding.UTF8.GetPreamble();
                 fs.Write(BOM, 0, BOM.Length);
 
-                byte[] buf = StringToByteArray(@"<?xml version=""1.0""?><unrecognized>" + Environment.NewLine, utf8);
+                var buf = StringToByteArray(@"<?xml version=""1.0""?><unrecognized>" + Environment.NewLine, utf8);
                 fs.Write(buf, 0, buf.Length);
 
-                bool bLikelyError;
-                int wordsCount = radix.Count;
+            	int wordsCount = radix.Count;
 
                 // Get and sort all the unknown words
-                CoverageData cd = null;
-                DictRadix<CoverageData>.RadixEnumerator en = radix.GetEnumerator() as DictRadix<CoverageData>.RadixEnumerator;
+                CoverageData cd;
+                var en = radix.GetEnumerator() as DictRadix<CoverageData>.RadixEnumerator;
+
+				if (en == null) return;
+
                 while (en.MoveNext() && !WasAbortSet)
                 {
                     totalWordsCount++;
 
                     // A known word - only relevant if ComputeCoverage == true
-                    cd = en.Current as CoverageData;
+                    cd = en.Current;
                     if (cd == null || cd.KnownToHSpell)
                         continue;
 
-                    string w = en.CurrentKey;
+                    var w = en.CurrentKey;
                     unrecWordsCount++;
 
-                    bLikelyError = false;
+                    var bLikelyError = false;
 
                     if (!Regex.IsMatch(w, @"^[אבגדהוזחטיכלמנסעפצקרשת'""]+?[ףץךןם]??[']??$") // final letters should be used only at the end of word
                         || w.Length > 15 // too long a word
@@ -232,8 +221,8 @@ namespace HSpellCoverageTester
 
         protected static byte[] StringToByteArray(string str, Encoder enc)
         {
-            char[] ca = str.ToCharArray();
-            byte[] ret = new byte[enc.GetByteCount(ca, 0, ca.Length, false)];
+            var ca = str.ToCharArray();
+            var ret = new byte[enc.GetByteCount(ca, 0, ca.Length, false)];
             int charsUsed, bytesUsed;
             bool completed;
             enc.Convert(ca, 0, ca.Length, ret, 0, ret.Length, true, out charsUsed, out bytesUsed, out completed);

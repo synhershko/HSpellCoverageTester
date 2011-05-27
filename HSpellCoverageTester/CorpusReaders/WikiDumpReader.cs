@@ -26,19 +26,19 @@ namespace HSpellCoverageTester.CorpusReaders
         /// <summary>
         /// UTF8 decoder which would throw on unknown character
         /// </summary>
-        private Decoder utf8 = new UTF8Encoding(true, false).GetDecoder();
+        private readonly Decoder utf8 = new UTF8Encoding(true, false).GetDecoder();
         /// <summary>
         /// The path to the dump file
         /// </summary>
-        private string filePath;
+        private readonly string filePath;
         /// <summary>
         /// The buffer for the beginnings of the blocks
         /// </summary>
-        private long[] beginnings = new long[MAX_BLOCKS_NO];
+        private readonly long[] beginnings = new long[MAX_BLOCKS_NO];
         /// <summary>
         /// The buffer for the ends of the blocks
         /// </summary>
-        private long[] ends = new long[MAX_BLOCKS_NO];
+        private readonly long[] ends = new long[MAX_BLOCKS_NO];
         /// <summary>
         /// The buffer for the current block
         /// </summary>
@@ -69,24 +69,26 @@ namespace HSpellCoverageTester.CorpusReaders
 
         LinkedList<WikiPage> pages = new LinkedList<WikiPage>();
 
-        public ReportProgressDelegate ProgressFunc { get { return m_progressFunc; } set { m_progressFunc = value; } }
-        private ReportProgressDelegate m_progressFunc = null;
+    	public ReportProgressDelegate ProgressFunc { get; set; }
 
-        public WikiDumpReader(string dumpFilePath)
+    	public WikiDumpReader(string dumpFilePath)
         {
-            this.filePath = dumpFilePath;
+    		AbortReading = false;
+    		HitDocumentFunc = null;
+    		ProgressFunc = null;
+        	filePath = dumpFilePath;
         }
 
-        /// <summary>
+    	/// <summary>
         /// Locates the bzip2 blocks in the file
         /// </summary>
         private void LocateBlocks()
         {
             ProgressFunc(0, "Locating bz2 blocks...", true);
-            FileInfo fi = new FileInfo(filePath);
+            var fi = new FileInfo(filePath);
             bz2_filesize = fi.Length;
 
-            bzip2.StatusCode status = bzip2.BZ2_bzLocateBlocks(filePath, beginnings, ends, ref totalBlocks, ref bz2_blocks_pct_done);
+            var status = bzip2.BZ2_bzLocateBlocks(filePath, beginnings, ends, ref totalBlocks, ref bz2_blocks_pct_done);
 
             if (status != bzip2.StatusCode.BZ_OK)
                 throw new Exception(String.Format("Failed locating the blocks in {0}: {1}", filePath, status));
@@ -115,8 +117,8 @@ namespace HSpellCoverageTester.CorpusReaders
             if (decompressionBuf == null)
                 decompressionBuf = new byte[buf.Length * 4];
 
-            int intBufSize = (int)bufSize;
-            int intDecompSize = decompressionBuf.Length;
+            var intBufSize = (int)bufSize;
+            var intDecompSize = decompressionBuf.Length;
 
             status = bzip2.BZ2_bzDecompress(buf, intBufSize, decompressionBuf, ref intDecompSize);
 
@@ -161,19 +163,18 @@ namespace HSpellCoverageTester.CorpusReaders
             charBuf = new char[bufSize];
 
             // Whether there was a Wiki topic carryover from current block to the next one
-            char[] charCarryOver = new char[0];
+            var charCarryOver = new char[0];
 
             // The length of the currently loaded data
-            long loadedLength = 0;
 
-            ProgressFunc(0, "Reading Wiki pages...", true);
-            StringBuilder sb = new StringBuilder();
+        	ProgressFunc(0, "Reading Wiki pages...", true);
+            var sb = new StringBuilder();
 
             for (long currentBlock = 0; currentBlock < totalBlocks && !AbortReading; currentBlock++)
             {
                 ProgressFunc((byte)((double)(currentBlock * 100) / (double)totalBlocks), null, true);
 
-                loadedLength = LoadBlock(beginnings[currentBlock], ends[currentBlock], ref blockBuf);
+                var loadedLength = LoadBlock(beginnings[currentBlock], ends[currentBlock], ref blockBuf);
 
                 if (charBuf.Length < blockBuf.Length)
                 {
@@ -268,8 +269,8 @@ namespace HSpellCoverageTester.CorpusReaders
                     break;
 
                 // Start creating the object for the tokenizing ThreadPool thread
-                long[] begins = new long[1];
-                long[] ends = new long[1];
+                var begins = new long[1];
+                var ends = new long[1];
 
                 // Was there a carryover?
                 if (firstRun)
@@ -380,7 +381,7 @@ namespace HSpellCoverageTester.CorpusReaders
             byte[] currentBuf = null;
 
             utf8.Reset();
-            StringBuilder sb = new StringBuilder();
+            var sb = new StringBuilder();
 
             for (int i = 0; i < begin.Length; i++)
             {
@@ -416,20 +417,10 @@ namespace HSpellCoverageTester.CorpusReaders
 
         #region ICorpusReader Members
 
-        public HitDocumentDelegate HitDocumentFunc
-        {
-            get { return m_hitDocumentFunc; }
-            set { m_hitDocumentFunc = value; }
-        }
-        private HitDocumentDelegate m_hitDocumentFunc = null;
+    	public HitDocumentDelegate HitDocumentFunc { get; set; }
 
-        public bool AbortReading
-        {
-            get { return m_AbortReading; }
-            set { m_AbortReading = value; }
-        }
-        private bool m_AbortReading = false;
+    	public bool AbortReading { get; set; }
 
-        #endregion
+    	#endregion
     }
 }
