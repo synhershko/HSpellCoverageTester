@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Text;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Web;
+using HSpellCoverageTester.Common;
 
 // This code was borrowed from the BzReader project: http://code.google.com/p/bzreader/
 
@@ -67,8 +69,6 @@ namespace HSpellCoverageTester.CorpusReaders
         private long previousBlockBeginning = -1;
         private long previousBlockEnd = -1;
 
-        LinkedList<WikiPage> pages = new LinkedList<WikiPage>();
-
     	public ReportProgressDelegate ProgressFunc { get; set; }
 
     	public WikiDumpReader(string dumpFilePath)
@@ -106,9 +106,8 @@ namespace HSpellCoverageTester.CorpusReaders
         /// <returns>The length of the loaded data, in bytes</returns>
         private long LoadBlock(long beginning, long end, ref byte[] buf)
         {
-            long bufSize = buf.LongLength;
-
-            bzip2.StatusCode status = bzip2.BZ2_bzLoadBlock(filePath, beginning, end, buf, ref bufSize);
+            var bufSize = buf.LongLength;
+            var status = bzip2.BZ2_bzLoadBlock(filePath, beginning, end, buf, ref bufSize);
 
             if (status != bzip2.StatusCode.BZ_OK)
                 throw new Exception(String.Format("Failed loading {0} block starting at {1}: {2}", filePath, beginning, status));
@@ -134,7 +133,7 @@ namespace HSpellCoverageTester.CorpusReaders
             }
 
             if (decompressionBuf.Length > 32000000)
-                throw new Exception(String.Format("Failed uncompressing block starting at {0}: too much memory required", beginning));
+                throw new OutOfMemoryException(String.Format("Failed uncompressing block starting at {0}: too much memory required", beginning));
 
             if (status != bzip2.StatusCode.BZ_OK)
                 throw new Exception(String.Format("Failed uncompressing block starting at {0}: {1}", beginning, status));
@@ -156,7 +155,7 @@ namespace HSpellCoverageTester.CorpusReaders
             LocateBlocks();
 
             // Two times more than the first block but not less than 100 bytes
-            long bufSize = ((ends[0] - beginnings[0]) / 8) * 2 + 100;
+            var bufSize = ((ends[0] - beginnings[0]) / 8) * 2 + 100;
 
             // Buffers for the current and next block
             blockBuf = new byte[bufSize];
@@ -201,9 +200,8 @@ namespace HSpellCoverageTester.CorpusReaders
 
                 sb.Append(charBuf, 0, charsUsed);
 
-                int carryOverLength = charCarryOver.Length;
-
-                int charsMatched = ProcessBlock(sb.ToString(), beginnings[currentBlock], ends[currentBlock],
+                var carryOverLength = charCarryOver.Length;
+                var charsMatched = ProcessBlock(sb.ToString(), beginnings[currentBlock], ends[currentBlock],
                      carryOverLength, currentBlock == totalBlocks - 1);
 
                 // There's a Wiki topic carryover, let's store the characters which need to be carried over 
@@ -231,13 +229,11 @@ namespace HSpellCoverageTester.CorpusReaders
         /// <returns>The number of characters in the end of the string that match the header entry</returns>
         private int ProcessBlock(string currentText, long beginning, long end, int charCarryOver, bool lastBlock)
         {
-            bool firstRun = true;
-
-            int topicStart = currentText.IndexOf("<title>", StringComparison.InvariantCultureIgnoreCase);
+            var firstRun = true;
+            var topicStart = currentText.IndexOf("<title>", StringComparison.InvariantCultureIgnoreCase);
+			var title = String.Empty;
 
             int titleEnd, idStart, idEnd, topicEnd = -1;
-
-            string title = String.Empty;
             long id;
 
             while (topicStart >= 0 && !AbortReading)
@@ -298,27 +294,27 @@ namespace HSpellCoverageTester.CorpusReaders
                 begins[0] = beginning;
                 ends[0] = end;
 
-                //WikiPage p = new WikiPage(id, title, begins, ends);
+                var contents = currentText.Substring(topicStart, topicEnd - topicStart + 7/* == "</text>".Length */);
+                contents = GetContentSection(contents, id, title);
 
-                string contents = currentText.Substring(topicStart, topicEnd - topicStart + 7/* "</text>".Length */);
-                contents = WikiPage.GetContentSection(contents, id, title);
+				// For some weird reason, the Niqqud character Dagesh is not being used directly in he-wiki but
+				// through the use of special markup
+				var strippedContent = contents.Replace("{{דגש}}", "\u05BC");
 
-                // Strip all HTML tags
-                string strippedContent = Regex.Replace(contents
-                    , @"</?[A-Z][A-Z0-9]*\b[^>]*>", " ", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+				//// Strip all HTML tags
+				//strippedContent = Regex.Replace(strippedContent
+				//    , @"</?[A-Z][A-Z0-9]*\b[^>]*>", " ", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
 
-                // Remove language referral tags
-                strippedContent = Regex.Replace(strippedContent, @"\[\[([A-Z-]+?):(.+?):(.+?)\]\]", " ", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+				//// Remove language referral tags
+				//strippedContent = Regex.Replace(strippedContent, @"\[\[([A-Z-]+?):(.+?):(.+?)\]\]", " ", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
                 
-                // For some weird reason, the Niqqud character Dagesh is not being used directly in he-wiki but
-                // through the use of special markup
-                strippedContent = strippedContent.Replace("{{דגש}}", "\u05BC");
-
                 // Process document
-                HitDocumentFunc(string.Format("{0} {1}", title, strippedContent), id);
+            	var doc = new CorpusDocument {Id = id.ToString(), Title = title};
+            	doc.SetContent(strippedContent, CorpusDocument.ContentFormat.WikiMarkup);
+            	HitDocumentFunc(doc);
 
                 // Store the last successful title start position
-                int nextTopicStart = currentText.IndexOf("<title>", topicStart + 1, StringComparison.InvariantCultureIgnoreCase);
+                var nextTopicStart = currentText.IndexOf("<title>", topicStart + 1, StringComparison.InvariantCultureIgnoreCase);
 
                 if (nextTopicStart >= 0)
                 {
@@ -333,8 +329,7 @@ namespace HSpellCoverageTester.CorpusReaders
             }
 
             // Now calculate how many characters we need to save for next block
-            int charsToSave = 0;
-
+            var charsToSave = 0;
             if (topicStart == -1)
             {
                 if (!lastBlock)
@@ -414,6 +409,36 @@ namespace HSpellCoverageTester.CorpusReaders
 
             return sb.ToString();
         }
+
+		/// <summary>
+		/// Given a raw Wiki content, returns the actual content section
+		/// </summary>
+		/// <param name="rawContent"></param>
+		/// <param name="topicId"></param>
+		/// <param name="title"></param>
+		/// <returns></returns>
+		public static string GetContentSection(string rawContent, long topicId, string title)
+		{
+			var searchfor = String.Format("<id>{0}</id>", topicId);
+
+			var pos = rawContent.IndexOf(searchfor, StringComparison.InvariantCultureIgnoreCase);
+			if (pos < 0)
+				throw new Exception(String.Format("Could not locate topic {0} in block", title));
+
+			var textStart = rawContent.IndexOf("<text", pos, StringComparison.InvariantCultureIgnoreCase);
+			if (textStart < 0)
+				throw new Exception(String.Format("Could not locate text marker for topic {0} in block", title));
+
+			var extractionStart = rawContent.IndexOf('>', textStart);
+			if (extractionStart < 0)
+				throw new Exception(String.Format("Could not locate text start for topic {0} in block", title));
+
+			var extractionEnd = rawContent.IndexOf("</text>", extractionStart, StringComparison.InvariantCultureIgnoreCase);
+			if (extractionEnd < 0)
+				throw new Exception(String.Format("Could not locate text end for topic {0} in block", title));
+
+			return HttpUtility.HtmlDecode(rawContent.Substring(extractionStart + 1, extractionEnd - extractionStart - 1));
+		}
 
         #region ICorpusReader Members
 

@@ -103,29 +103,6 @@ public class WikiPage
         Array.Sort(Ends);
     }*/
 
-    public static string GetContentSection(string RawContent, long topicId, string title)
-    {
-        string searchfor = String.Format("<id>{0}</id>", topicId);
-
-        int pos = RawContent.IndexOf(searchfor, StringComparison.InvariantCultureIgnoreCase);
-        if (pos < 0)
-            throw new Exception(String.Format("Could not locate topic {0} in block", title));
-
-        int textStart = RawContent.IndexOf("<text", pos, StringComparison.InvariantCultureIgnoreCase);
-        if (textStart < 0)
-            throw new Exception(String.Format("Could not locate text marker for topic {0} in block", title));
-
-        int extractionStart = RawContent.IndexOf('>', textStart);
-        if (extractionStart < 0)
-            throw new Exception(String.Format("Could not locate text start for topic {0} in block", title));
-
-        int extractionEnd = RawContent.IndexOf("</text>", extractionStart, StringComparison.InvariantCultureIgnoreCase);
-        if (extractionEnd < 0)
-            throw new Exception(String.Format("Could not locate text end for topic {0} in block", title));
-
-        return HttpUtility.HtmlDecode(RawContent.Substring(extractionStart + 1, extractionEnd - extractionStart - 1));
-    }
-
     /*
     public string GetFormattedContent()
     {

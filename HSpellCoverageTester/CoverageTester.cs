@@ -10,8 +10,6 @@ using HebMorph.DataStructures;
 
 namespace HSpellCoverageTester
 {
-    public delegate void ReportProgressDelegate(int progressPercentage, string status, bool isRunning);
-
     public class CoverageTester
     {
         public event ProgressChangedEventHandler ProgressChanged;
@@ -77,16 +75,15 @@ namespace HSpellCoverageTester
             }
         }
 
-        private void GotDocument(object doc, object docId)
+        private void GotDocument(CorpusDocument doc)
         {
             if (doc == null)
                 return;
 
-            var docContents = doc.ToString();
             var word = string.Empty;
             var tokens = new List<HebMorph.Token>();
 
-            lemmatizer.SetStream(new System.IO.StringReader(docContents));
+			lemmatizer.SetStream(new System.IO.StringReader(doc.Content));
             
             // The HebMorph lemmatizer will always return a token, unless an unrecognized Hebrew
             // word was hit, then an empty tokens array will be returned.
@@ -106,7 +103,7 @@ namespace HSpellCoverageTester
                     }
                     else
                     {
-                        o = new CoverageData {Count = 1, FirstKnownLocation = docId, KnownToHSpell = false};
+                        o = new CoverageData {Count = 1, FirstKnownLocation = doc.Id, KnownToHSpell = false};
                     	radix.AddNode(word, o);
                     }
                     continue;
@@ -131,7 +128,7 @@ namespace HSpellCoverageTester
                     }
                     else
                     {
-                        o = new CoverageData {Count = 1, FirstKnownLocation = docId, KnownToHSpell = true};
+                        o = new CoverageData {Count = 1, FirstKnownLocation = doc.Id, KnownToHSpell = true};
                     	radix.AddNode(word, o);
                     }
                 }

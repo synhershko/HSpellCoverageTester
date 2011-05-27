@@ -1,6 +1,9 @@
-﻿namespace HSpellCoverageTester.CorpusReaders
+﻿using HSpellCoverageTester.Common;
+
+namespace HSpellCoverageTester.CorpusReaders
 {
-    public delegate void HitDocumentDelegate(object documentContent, object documentLocation);
+	public delegate void ReportProgressDelegate(int progressPercentage, string status, bool isRunning);
+    public delegate void HitDocumentDelegate(CorpusDocument doc);
 
     public interface ICorpusReader
     {
