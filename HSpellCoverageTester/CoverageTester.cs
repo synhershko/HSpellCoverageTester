@@ -47,8 +47,8 @@ namespace HSpellCoverageTester
             ReportProgress(0, "Initializing hspell...", true);
             lemmatizer = new HebMorph.StreamLemmatizer(HSpellPath, true, false) {TolerateWhenLemmatizingStream = false};
 
-        	corpusReader.HitDocumentFunc = GotDocument;
-            corpusReader.ProgressFunc = ReportProgress;
+        	corpusReader.OnDocument += GotDocument;
+            corpusReader.OnProgress += ReportProgress;
             corpusReader.AbortReading = false;
             corpusReader.Read();
 
@@ -60,7 +60,7 @@ namespace HSpellCoverageTester
             ReportProgress(100, "Finalizing...", false);
         }
 
-        protected void ReportProgress(int progressPercentage, string status, bool isRunning)
+        protected void ReportProgress(byte progressPercentage, string status, bool isRunning)
         {
             var pi = new ProgressInfo {Status = status, IsStillRunning = isRunning};
         	ReportProgress(progressPercentage, pi);

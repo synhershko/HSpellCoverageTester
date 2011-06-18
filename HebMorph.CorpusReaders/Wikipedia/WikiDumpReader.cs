@@ -67,13 +67,9 @@ namespace HebMorph.CorpusReaders.Wikipedia
         private long previousBlockBeginning = -1;
         private long previousBlockEnd = -1;
 
-    	public ReportProgressDelegate ProgressFunc { get; set; }
-
     	public WikiDumpReader(string dumpFilePath)
         {
     		AbortReading = false;
-    		HitDocumentFunc = null;
-    		ProgressFunc = null;
         	filePath = dumpFilePath;
         }
 
@@ -82,7 +78,7 @@ namespace HebMorph.CorpusReaders.Wikipedia
         /// </summary>
         private void LocateBlocks()
         {
-            ProgressFunc(0, "Locating bz2 blocks...", true);
+			ReportProgress(0, "Locating bz2 blocks...", true);
             var fi = new FileInfo(filePath);
             bz2_filesize = fi.Length;
 
@@ -164,12 +160,12 @@ namespace HebMorph.CorpusReaders.Wikipedia
 
             // The length of the currently loaded data
 
-        	ProgressFunc(0, "Reading Wiki pages...", true);
+			ReportProgress(0, "Reading Wiki pages...", true);
             var sb = new StringBuilder();
 
             for (long currentBlock = 0; currentBlock < totalBlocks && !AbortReading; currentBlock++)
             {
-                ProgressFunc((byte)((double)(currentBlock * 100) / (double)totalBlocks), null, true);
+				ReportProgress((byte)(currentBlock * 100 / (double)totalBlocks), null, true);
 
                 var loadedLength = LoadBlock(beginnings[currentBlock], ends[currentBlock], ref blockBuf);
 
@@ -233,6 +229,7 @@ namespace HebMorph.CorpusReaders.Wikipedia
 
             int titleEnd, idStart, idEnd, topicEnd = -1;
             long id;
+        	bool shouldBreak = false;
 
             while (topicStart >= 0 && !AbortReading)
             {
@@ -438,10 +435,16 @@ namespace HebMorph.CorpusReaders.Wikipedia
 			return HttpUtility.HtmlDecode(rawContent.Substring(extractionStart + 1, extractionEnd - extractionStart - 1));
 		}
 
-        #region ICorpusReader Members
+		protected void ReportProgress(byte progressPercentage, string status, bool isRunning)
+		{
+			if (OnProgress != null)
+				OnProgress(progressPercentage, status, isRunning);
+		}
 
-    	public HitDocumentDelegate HitDocumentFunc { get; set; }
+    	#region ICorpusReader Members
 
+    	public event ReportProgressDelegate OnProgress;
+    	public event HitDocumentDelegate OnDocument;
     	public bool AbortReading { get; set; }
 
     	#endregion
