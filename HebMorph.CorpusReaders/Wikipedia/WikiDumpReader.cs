@@ -244,6 +244,7 @@ namespace HebMorph.CorpusReaders.Wikipedia
                     break;
 
                 title = currentText.Substring(topicStart + "<title>".Length, titleEnd - topicStart - "<title>".Length);
+            	title = System.Web.HttpUtility.HtmlDecode(title); // The title is stored HTML encoded
 
                 idStart = currentText.IndexOf("<id>", titleEnd, StringComparison.InvariantCultureIgnoreCase);
                 if (idStart < 0)
@@ -289,38 +290,41 @@ namespace HebMorph.CorpusReaders.Wikipedia
                 begins[0] = beginning;
                 ends[0] = end;
 
-                var contents = currentText.Substring(topicStart, topicEnd - topicStart + 7/* == "</text>".Length */);
+            	var prevTopicStart = topicStart;
+				// Store the last successful title start position
+				var nextTopicStart = currentText.IndexOf("<title>", topicStart + 1, StringComparison.InvariantCultureIgnoreCase);
+				if (nextTopicStart >= 0)
+				{
+					topicStart = nextTopicStart;
+				}
+				else
+				{
+					shouldBreak = true;
+				}
+
+				firstRun = false;
+
+				// skip meta-pages - pages with irrelevant or no content
+				if (title.StartsWith("תבנית:") || title.StartsWith("עזרה:") || title.StartsWith("ויקיפדיה:")
+					|| title.StartsWith("קטגוריה:") || title.StartsWith("קובץ:") || title.StartsWith("פורטל:"))
+				{
+					if (shouldBreak) break;
+					continue;
+				}
+
+            	var contents = currentText.Substring(prevTopicStart, topicEnd - prevTopicStart + 7/* == "</text>".Length */);
                 contents = GetContentSection(contents, id, title);
 
 				// For some weird reason, the Niqqud character Dagesh is not being used directly in he-wiki but
 				// through the use of special markup
 				var strippedContent = contents.Replace("{{דגש}}", "\u05BC");
-
-				//// Strip all HTML tags
-				//strippedContent = Regex.Replace(strippedContent
-				//    , @"</?[A-Z][A-Z0-9]*\b[^>]*>", " ", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
-
-				//// Remove language referral tags
-				//strippedContent = Regex.Replace(strippedContent, @"\[\[([A-Z-]+?):(.+?):(.+?)\]\]", " ", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
                 
                 // Process document
             	var doc = new CorpusDocument {Id = id.ToString(), Title = title};
             	doc.SetContent(strippedContent, CorpusDocument.ContentFormat.WikiMarkup);
-            	HitDocumentFunc(doc);
+				if (OnDocument != null) OnDocument(doc);
 
-                // Store the last successful title start position
-                var nextTopicStart = currentText.IndexOf("<title>", topicStart + 1, StringComparison.InvariantCultureIgnoreCase);
-
-                if (nextTopicStart >= 0)
-                {
-                    topicStart = nextTopicStart;
-                }
-                else
-                {
-                    break;
-                }
-
-                firstRun = false;
+				if (shouldBreak) break;
             }
 
             // Now calculate how many characters we need to save for next block
@@ -373,14 +377,14 @@ namespace HebMorph.CorpusReaders.Wikipedia
             utf8.Reset();
             var sb = new StringBuilder();
 
-            for (int i = 0; i < begin.Length; i++)
+            for (var i = 0; i < begin.Length; i++)
             {
                 if (blockBuf == null)
                 {
                     blockBuf = new byte[((end[i] - begin[i]) / 8) * 2 + 100];
                 }
 
-                long loadedLen = LoadBlock(begin[i], end[i], ref blockBuf);
+                var loadedLen = LoadBlock(begin[i], end[i], ref blockBuf);
 
                 currentBuf = new byte[loadedLen];
 

@@ -82,7 +82,14 @@ namespace HSpellCoverageTester
             var word = string.Empty;
             var tokens = new List<HebMorph.Token>();
 
-			lemmatizer.SetStream(new System.IO.StringReader(doc.Content));
+			// Strip all HTML tags
+        	var strippedContent = Regex.Replace(doc.Content, @"</?[A-Z][A-Z0-9]*\b[^>]*>", " ",
+        	                                    RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+
+			// Remove wikipedia language referral tags
+			strippedContent = Regex.Replace(strippedContent, @"\[\[([A-Z-]+?):(.+?):(.+?)\]\]", " ", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+
+			lemmatizer.SetStream(new System.IO.StringReader(strippedContent));
             
             // The HebMorph lemmatizer will always return a token, unless an unrecognized Hebrew
             // word was hit, then an empty tokens array will be returned.
@@ -156,7 +163,7 @@ namespace HSpellCoverageTester
                 var buf = StringToByteArray(@"<?xml version=""1.0""?><unrecognized>" + Environment.NewLine, utf8);
                 fs.Write(buf, 0, buf.Length);
 
-            	int wordsCount = radix.Count;
+            	var wordsCount = radix.Count;
 
                 // Get and sort all the unknown words
                 CoverageData cd;
@@ -178,8 +185,9 @@ namespace HSpellCoverageTester
 
                     var bLikelyError = false;
 
-                    if (!Regex.IsMatch(w, @"^[אבגדהוזחטיכלמנסעפצקרשת'""]+?[ףץךןם]??[']??$") // final letters should be used only at the end of word
+					if (!Regex.IsMatch(w, @"^[אבגדהוזחטיכלמנסעפצקרשת'""]+?[ףץךןם]??[']??$", RegexOptions.Compiled) // final letters should be used only at the end of word
                         || w.Length > 15 // too long a word
+						|| (w.Length == 2 && w.EndsWith("'")) // letter reference
                         )
                     {
                         likelyErrors++;
@@ -200,7 +208,7 @@ namespace HSpellCoverageTester
                     buf = StringToByteArray(@"</unrecognized>" + Environment.NewLine, utf8);
                     fs.Write(buf, 0, buf.Length);
 
-                    string stats = string.Format(@"<stats unknownWords=""{0}"" likelyErrors=""{1}"" ", unrecWordsCount, likelyErrors);
+                    var stats = string.Format(@"<stats unknownWords=""{0}"" likelyErrors=""{1}"" ", unrecWordsCount, likelyErrors);
                     if (ComputeCoverage)
                     {
                         unrecWordsCount -= likelyErrors;
