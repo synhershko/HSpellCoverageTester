@@ -3,14 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HSpellCoverageTester", "HSpellCoverageTester\HSpellCoverageTester.csproj", "{D32E4E06-21A3-4293-A52D-5CE6D574D339}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HebMorph", "..\HebMorph\dotNet\HebMorph\HebMorph.csproj", "{EF21A9E0-8FEE-43CD-8D60-B3696E033FED}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bzip2", "bzip2\bzip2.vcxproj", "{C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HebMorph.CorpusReaders", "HebMorph.CorpusReaders\HebMorph.CorpusReaders.csproj", "{EE237190-F52A-47FC-8BAA-D03445A11172}"
-	ProjectSection(ProjectDependencies) = postProject
-		{C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8} = {C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8}
-	EndProjectSection
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HebMorph.VS2010", "..\HebMorph\dotNet\HebMorph\HebMorph.VS2010.csproj", "{EF21A9E0-8FEE-43CD-8D60-B3696E033FED}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -42,26 +35,6 @@ Global
 		{EF21A9E0-8FEE-43CD-8D60-B3696E033FED}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{EF21A9E0-8FEE-43CD-8D60-B3696E033FED}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{EF21A9E0-8FEE-43CD-8D60-B3696E033FED}.Release|Win32.ActiveCfg = Release|Any CPU
-		{C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8}.Debug|Any CPU.ActiveCfg = Debug|Win32
-		{C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
-		{C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8}.Debug|Mixed Platforms.Build.0 = Debug|Win32
-		{C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8}.Debug|Win32.ActiveCfg = Debug|Win32
-		{C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8}.Debug|Win32.Build.0 = Debug|Win32
-		{C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8}.Release|Any CPU.ActiveCfg = Release|Win32
-		{C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8}.Release|Mixed Platforms.ActiveCfg = Release|Win32
-		{C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8}.Release|Mixed Platforms.Build.0 = Release|Win32
-		{C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8}.Release|Win32.ActiveCfg = Release|Win32
-		{C71B449B-D2D9-4CF1-8A1B-134EF7AC64B8}.Release|Win32.Build.0 = Release|Win32
-		{EE237190-F52A-47FC-8BAA-D03445A11172}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{EE237190-F52A-47FC-8BAA-D03445A11172}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{EE237190-F52A-47FC-8BAA-D03445A11172}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
-		{EE237190-F52A-47FC-8BAA-D03445A11172}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
-		{EE237190-F52A-47FC-8BAA-D03445A11172}.Debug|Win32.ActiveCfg = Debug|Any CPU
-		{EE237190-F52A-47FC-8BAA-D03445A11172}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{EE237190-F52A-47FC-8BAA-D03445A11172}.Release|Any CPU.Build.0 = Release|Any CPU
-		{EE237190-F52A-47FC-8BAA-D03445A11172}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
-		{EE237190-F52A-47FC-8BAA-D03445A11172}.Release|Mixed Platforms.Build.0 = Release|Any CPU
-		{EE237190-F52A-47FC-8BAA-D03445A11172}.Release|Win32.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -52,6 +52,10 @@
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="HebMorph.CorpusReaders, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\SharedLibs\HebMorph.CorpusReaders.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Deployment" />
@@ -100,10 +104,6 @@
       <Project>{EF21A9E0-8FEE-43CD-8D60-B3696E033FED}</Project>
       <Name>HebMorph</Name>
     </ProjectReference>
-    <ProjectReference Include="..\HebMorph.CorpusReaders\HebMorph.CorpusReaders.csproj">
-      <Project>{EE237190-F52A-47FC-8BAA-D03445A11172}</Project>
-      <Name>HebMorph.CorpusReaders</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Client.3.5">
@@ -135,7 +135,7 @@
     </PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>copy /Y "$(SolutionDir)\bzip2\bin\$(ConfigurationName)\bzip2.dll" "$(TargetDir)"
-copy /Y "$(SolutionDir)\bzip2\bin\$(ConfigurationName)\bzip2.pdb" "$(TargetDir)"</PostBuildEvent>
+    <PostBuildEvent>copy /Y "$(SolutionDir)\SharedLibs\bzip2.dll" "$(TargetDir)"
+copy /Y "$(SolutionDir)\SharedLibs\bzip2.pdb" "$(TargetDir)"</PostBuildEvent>
   </PropertyGroup>
 </Project>
