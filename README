@@ -1,19 +1,17 @@
 A utility application to test the language coverage of the hspell dictionary
-(http://hspell.ivrix.org.il/, Copyright (C) 2000-2010, Nadav Har'El and Dan Kenigsberg)
+(http://hspell.ivrix.org.il/, Copyright (C) 2000-2011, Nadav Har'El and Dan Kenigsberg)
 
 See: http://www.code972.com/blog/2010/07/testing-hspell-language-coverage-using-wikipedia
 
-Copyright (C) 2010, Itamar Syn-Hershko
+Copyright (C) 2010-2011, Itamar Syn-Hershko
 
-It is released to the public licensed under the GNU General Public License
-(GPL). See the COPYING file included in this distribution for the whole text
-of the GNU General Public License version 2. Note that not only the programs in
-the distribution, but also the dictionary files and the generated word lists, are
-licensed under the GPL.
+It is released to the public licensed under the GNU Affero General Public License version 3.
+Note that not only the programs in the distribution, but also the dictionary files and the
+generated word lists, are licensed under the AGPLv3.
+
 There is no warranty of any kind for the contents of this distribution.
 
-Some code was borrowed from the BzReader project: http://code.google.com/p/bzreader/,
-also released under the GNU GPL.
+Some code was borrowed from the BzReader project: http://code.google.com/p/bzreader/.
 
 Usage:
 	1. Get the sources to a local folder (download tree / git clone)

@@ -1,12 +1,13 @@
-The HSpell Coverage Tester is copyright (C) 2010, Itamar Syn-Hershko.
+HSpellCoverageTester is copyright (C) 2010-2011, Itamar Syn-Hershko.
 
-The HSpell Coverage Tester relies on Hspell, copyright (C) 2000-2010, Nadav Har'El and Dan Kenigsberg.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License v3 as
+published by the Free Software Foundation.
 
-It is released to the public licensed under the GNU General Public License
-(GPL). See the COPYING file included in this distribution for the whole text
-of the GNU General Public License version 2.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-Note that not only the programs in the distribution, but also the
-dictionary files and the generated word lists produced by hspell,
-as well as the coverage test results, are licensed under the GPL.
-There is no warranty of any kind for the contents of this distribution.
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
